@@ -5,6 +5,7 @@ import CreateAccountScreen, { UserRegistrationData } from './components/CreateAc
 import Dashboard from './components/Dashboard';
 import ChatScreen from './components/ChatScreen';
 import VideoCallScreen from './components/VideoCallScreen';
+import CompanionMode from './components/CompanionMode';
 import AvatarRoom from './components/AvatarRoom';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -105,6 +106,16 @@ function App() {
               element={
                 user ? (
                   <VideoCallScreen user={user} />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              } 
+            />
+            <Route 
+              path="/companion-mode" 
+              element={
+                user ? (
+                  <CompanionMode user={user} />
                 ) : (
                   <Navigate to="/login" replace />
                 )

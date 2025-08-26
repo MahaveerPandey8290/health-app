@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MessageCircle, Video, User, LogOut, Sun, Moon } from 'lucide-react';
+import { MessageCircle, Video, User, LogOut, Sun, Coffee } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User as UserType } from '../App';
 
@@ -28,6 +28,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       gradient: "from-purple-400 to-pink-500",
       path: "/video-call",
       emoji: "🎥"
+    },
+    {
+      icon: Coffee,
+      title: "Companion Mode",
+      description: "Tea & Study atmospheres",
+      gradient: "from-orange-400 to-pink-500",
+      path: "/companion-mode",
+      emoji: "☕"
     },
     {
       icon: User,
