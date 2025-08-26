@@ -5,9 +5,10 @@ import FloatingShapes from './FloatingShapes';
 
 interface LoginScreenProps {
   onLogin: (email: string, password: string) => void;
+  onShowCreateAccount: () => void;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onShowCreateAccount }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -118,9 +119,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             className="text-center text-sm text-gray-500 mt-6"
           >
             New here? 
-            <span className="text-purple-500 font-medium cursor-pointer hover:text-purple-600 ml-1">
+            <button
+              onClick={onShowCreateAccount}
+              className="text-purple-500 font-medium hover:text-purple-600 ml-1 transition-colors"
+            >
               Create account
-            </span>
+            </button>
           </motion.p>
         </motion.div>
       </div>

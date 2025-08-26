@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginScreen from './components/LoginScreen';
+import CreateAccountScreen, { UserRegistrationData } from './components/CreateAccountScreen';
 import Dashboard from './components/Dashboard';
 import ChatScreen from './components/ChatScreen';
 import VideoCallScreen from './components/VideoCallScreen';
@@ -11,11 +12,18 @@ export interface User {
   email: string;
   name: string;
   avatar?: string;
+  age?: string;
+  gender?: string;
+  mobileNumber?: string;
+  country?: string;
+  address?: string;
+  pincode?: string;
 }
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<string>('');
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
 
   const handleLogin = (email: string, password: string) => {
     // Simple mock authentication
@@ -26,8 +34,25 @@ function App() {
     });
   };
 
+  const handleCreateAccount = (userData: UserRegistrationData) => {
+    // Simple mock registration - in a real app, this would call an API
+    setUser({
+      email: userData.email,
+      name: userData.name,
+      avatar: selectedAvatar,
+      age: userData.age,
+      gender: userData.gender,
+      mobileNumber: userData.mobileNumber,
+      country: userData.country,
+      address: userData.address,
+      pincode: userData.pincode
+    });
+    setShowCreateAccount(false);
+  };
+
   const handleLogout = () => {
     setUser(null);
+    setShowCreateAccount(false);
   };
 
   return (
@@ -39,7 +64,17 @@ function App() {
               path="/login" 
               element={
                 !user ? (
-                  <LoginScreen onLogin={handleLogin} />
+                  showCreateAccount ? (
+                    <CreateAccountScreen 
+                      onCreateAccount={handleCreateAccount}
+                      onBackToLogin={() => setShowCreateAccount(false)}
+                    />
+                  ) : (
+                    <LoginScreen 
+                      onLogin={handleLogin} 
+                      onShowCreateAccount={() => setShowCreateAccount(true)}
+                    />
+                  )
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )
