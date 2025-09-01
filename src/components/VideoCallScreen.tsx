@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '../App';
+import SubscriptionPopup from './SubscriptionPopup';
 
 interface VideoCallScreenProps {
   user: User;
@@ -36,6 +37,13 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ user }) => {
   const [selectedBackground, setSelectedBackground] = useState('none');
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isInCall, setIsInCall] = useState(false);
+  
+  // Timer and subscription states
+  const [callStartTime, setCallStartTime] = useState<Date | null>(null);
+  const [timeUsed, setTimeUsed] = useState(0);
+  const [showSubscriptionPopup, setShowSubscriptionPopup] = useState(false);
+  const [hasSubscription, setHasSubscription] = useState(false);
+  const FREE_TRIAL_DURATION = 10 * 60; // 10 minutes in seconds
   
   // Convai integration states
   const [convaiClient, setConvaiClient] = useState<any>(null);
@@ -110,6 +118,12 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ user }) => {
       }
     };
 
+    const getGreeting = () => {
+      const hour = new Date().getHours();
+      if (hour < 12) return "Good morning";
+      if (hour < 17) return "Good afternoon";
+      return "Good evening";
+    };
     initializeConvai();
 
     return () => {
@@ -132,6 +146,28 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ user }) => {
     };
   }, [convaiClient]);
 
+  // Timer effect for free trial
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isInCall && callStartTime && !hasSubscription) {
+      interval = setInterval(() => {
+        const now = new Date();
+        const elapsed = Math.floor((now.getTime() - callStartTime.getTime()) / 1000);
+        setTimeUsed(elapsed);
+        
+        // Show subscription popup after 10 minutes
+        if (elapsed >= FREE_TRIAL_DURATION) {
+          setShowSubscriptionPopup(true);
+          clearInterval(interval);
+        }
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isInCall, callStartTime, hasSubscription]);
   const startVideo = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
@@ -143,6 +179,7 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ user }) => {
         videoRef.current.srcObject = mediaStream;
       }
       setIsInCall(true);
+      setCallStartTime(new Date());
 
       // Start Convai session when video starts
       if (convaiClient && isConvaiConnected) {
@@ -152,7 +189,8 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ user }) => {
           
           // Send initial greeting
           setTimeout(() => {
-            sendMessageToLexi(`Hello! I'm ${user.name}. I'm here for a wellness session.`);
+            const displayName = user.displayName || user.name;
+            sendMessageToLexi(`Hello! I'm ${displayName}. I'm here for a wellness session.`);
           }, 2000);
         } catch (error) {
           console.error('Failed to start Convai session:', error);
@@ -246,6 +284,36 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ user }) => {
     navigate('/dashboard');
   };
 
+  const handleSubscribe = (planId: string) => {
+    // In a real app, this would integrate with a payment processor
+    console.log('Subscribing to plan:', planId);
+    setHasSubscription(true);
+    setShowSubscriptionPopup(false);
+    
+    // Reset timer and continue call
+    setCallStartTime(new Date());
+    setTimeUsed(0);
+    
+    // Show success message
+    const successMessage: any = {
+      speaker: 'lexi',
+      text: `Welcome to premium! You now have unlimited access to our wellness sessions. How can I help you today?`,
+      timestamp: new Date()
+    };
+    setConversationHistory(prev => [...prev, successMessage]);
+  };
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const getRemainingTime = () => {
+    if (hasSubscription) return null;
+    const remaining = FREE_TRIAL_DURATION - timeUsed;
+    return Math.max(0, remaining);
+  };
   const getBackgroundStyle = () => {
     switch (selectedBackground) {
       case 'blur':
@@ -303,6 +371,14 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ user }) => {
 
   return (
     <div className="min-h-screen bg-gray-900 relative overflow-hidden">
+      {/* Subscription Popup */}
+      <SubscriptionPopup
+        isOpen={showSubscriptionPopup}
+        onClose={() => setShowSubscriptionPopup(false)}
+        onSubscribe={handleSubscribe}
+        timeUsed={timeUsed}
+      />
+
       {/* Background Layer */}
       {selectedBackground !== 'none' && (
         <div 
@@ -327,9 +403,11 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ user }) => {
             <ArrowLeft className="w-6 h-6" />
           </motion.button>
           <div className="text-white">
-            <h1 className="text-lg font-bold">AI Wellness Session with Lexi</h1>
+            <h1 className="text-lg font-bold">
+              {getGreeting()}, {user.displayName || user.name}! 
+            </h1>
             <div className="flex items-center space-x-2">
-              <p className="text-sm opacity-75">Interactive AI Companion</p>
+              <p className="text-sm opacity-75">AI Wellness Session with Lexi</p>
               {isConvaiConnected && (
                 <div className="flex items-center space-x-1">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -340,14 +418,32 @@ const VideoCallScreen: React.FC<VideoCallScreenProps> = ({ user }) => {
           </div>
         </div>
 
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => setShowBackgrounds(!showBackgrounds)}
-          className="p-3 bg-black/30 backdrop-blur-lg text-white rounded-xl hover:bg-black/40 transition-all"
-        >
-          <Settings className="w-6 h-6" />
-        </motion.button>
+        <div className="flex items-center space-x-4">
+          {/* Timer Display */}
+          {!hasSubscription && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-black/40 backdrop-blur-lg px-4 py-2 rounded-xl"
+            >
+              <div className="text-center">
+                <p className="text-white text-xs font-medium">Free Trial</p>
+                <p className="text-white text-sm font-bold">
+                  {formatTime(getRemainingTime() || 0)} left
+                </p>
+              </div>
+            </motion.div>
+          )}
+          
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowBackgrounds(!showBackgrounds)}
+            className="p-3 bg-black/30 backdrop-blur-lg text-white rounded-xl hover:bg-black/40 transition-all"
+          >
+            <Settings className="w-6 h-6" />
+          </motion.button>
+        </div>
       </motion.header>
 
       {/* Background Selection Panel */}
