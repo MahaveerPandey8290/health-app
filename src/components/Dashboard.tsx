@@ -2,13 +2,9 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { MessageCircle, Video, User, LogOut, Sun } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-<<<<<<< HEAD
 import { User as UserType } from '../App';
 import maleAvatarImg from '../assets/images/male-avatar.png';
 import femaleAvatarImg from '../assets/images/female-avatar.png';
-=======
-import { User as UserType } from '../types';
->>>>>>> 9a00a34 (avatar-update)
 
 interface DashboardProps {
   user: UserType;

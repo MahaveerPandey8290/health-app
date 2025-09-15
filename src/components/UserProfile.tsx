@@ -342,11 +342,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser }) => {
               ))}
             </div>
           </div>
-<<<<<<< HEAD
           <div className="space-y-4">
-=======
-          <div className_="space-y-4">
->>>>>>> 9a00a34 (avatar-update)
             <div className="bg-gray-50 rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-600">Chat Usage</span>
