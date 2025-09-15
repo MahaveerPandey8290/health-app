@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { MessageCircle, Video, User, LogOut, Sun } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User as UserType } from '../App';
+import maleAvatarImg from '../assets/images/male-avatar.png';
+import femaleAvatarImg from '../assets/images/female-avatar.png';
 
 interface DashboardProps {
   user: UserType;
@@ -11,6 +13,13 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const navigate = useNavigate();
+  const savedAvatar = localStorage.getItem('userAvatar');
+  
+  const getAvatarImage = () => {
+    if (savedAvatar === 'male') return maleAvatarImg;
+    if (savedAvatar === 'female') return femaleAvatarImg;
+    return null;
+  };
 
   const features = [
     {
@@ -58,9 +67,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <motion.div
             animate={{ rotate: [0, 10, -10, 0] }}
             transition={{ repeat: Infinity, duration: 4 }}
-            className="w-10 h-10 bg-gradient-to-r from-purple-400 to-blue-400 rounded-full flex items-center justify-center"
+            className="w-12 h-12 rounded-full overflow-hidden border-2 border-purple-400 flex items-center justify-center bg-gradient-to-r from-purple-400 to-blue-400"
           >
-            <Sun className="w-6 h-6 text-white" />
+            {getAvatarImage() ? (
+              <img 
+                src={getAvatarImage()!} 
+                alt="User Avatar" 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Sun className="w-6 h-6 text-white" />
+            )}
           </motion.div>
           <div>
             <h1 className="text-xl font-bold text-gray-800">Mental Wellness</h1>

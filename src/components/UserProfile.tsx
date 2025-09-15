@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { User as UserType } from '../App';
 import { User, Bell, BarChart2, Edit, Save, X } from 'lucide-react';
+import maleAvatarImg from '../assets/images/male-avatar.png';
+import femaleAvatarImg from '../assets/images/female-avatar.png';
 
 interface UserProfileProps {
   user: UserType;
@@ -12,6 +14,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser }) => {
   const [activeTab, setActiveTab] = useState('subscription');
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState(user);
+  const savedAvatar = localStorage.getItem('userAvatar');
+  
+  const getAvatarImage = () => {
+    if (savedAvatar === 'male') return maleAvatarImg;
+    if (savedAvatar === 'female') return femaleAvatarImg;
+    return null;
+  };
 
   const handleSave = () => {
     onUpdateUser(editedUser);
@@ -44,6 +53,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser }) => {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <p><strong>Name:</strong> {user.name}</p>
             <p><strong>Email:</strong> {user.email}</p>
+           <p><strong>Avatar:</strong> {savedAvatar ? `${savedAvatar.charAt(0).toUpperCase() + savedAvatar.slice(1)} Avatar` : 'Not selected'}</p>
             <p><strong>Current Plan:</strong> Free Tier</p>
             <p><strong>Subscription Status:</strong> Active</p>
           </motion.div>
@@ -61,7 +71,23 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdateUser }) => {
     <div className="min-h-screen bg-gray-100 p-4">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">User Profile</h1>
+                <div className="flex items-center space-x-4">
+                    <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-purple-400 bg-gradient-to-r from-purple-400 to-blue-400 flex items-center justify-center">
+                        {getAvatarImage() ? (
+                            <img 
+                                src={getAvatarImage()!} 
+                                alt="User Avatar" 
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <User className="w-8 h-8 text-white" />
+                        )}
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold">{user.name}</h1>
+                        <p className="text-gray-600">{user.email}</p>
+                    </div>
+                </div>
                 <div>
                     {isEditing ? (
                         <>

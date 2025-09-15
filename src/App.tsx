@@ -35,7 +35,8 @@ function App() {
 
   const handleAccountCreationComplete = (displayName: string) => {
     if (user) {
-      setUser({ ...user, name: displayName });
+      const savedAvatar = localStorage.getItem('userAvatar');
+      setUser({ ...user, name: displayName, avatar: savedAvatar || '' });
     }
     setIsCreatingAccount(false); // Finish account creation
   };
