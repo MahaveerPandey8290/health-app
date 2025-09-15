@@ -3,6 +3,9 @@
   packages = [
     pkgs.nodejs_20
   ];
+  idx.init = {
+    command = ["npm" "install"];
+  };
   idx.extensions = [
     "svelte.svelte-vscode"
     "vue.volar"
