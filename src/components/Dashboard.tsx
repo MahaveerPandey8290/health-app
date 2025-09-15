@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MessageCircle, Video, User, LogOut, Sun, Coffee } from 'lucide-react';
+import { MessageCircle, Video, User, LogOut, Sun } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User as UserType } from '../App';
 
@@ -28,14 +28,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       gradient: "from-purple-400 to-pink-500",
       path: "/video-call",
       emoji: "🎥"
-    },
-    {
-      icon: Coffee,
-      title: "Companion Mode",
-      description: "Tea & Study atmospheres",
-      gradient: "from-orange-400 to-pink-500",
-      path: "/companion-mode",
-      emoji: "☕"
     },
     {
       icon: User,
@@ -76,14 +68,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           </div>
         </div>
         
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={onLogout}
-          className="p-2 text-gray-600 hover:text-gray-800 hover:bg-white/50 rounded-xl transition-all"
-        >
-          <LogOut className="w-5 h-5" />
-        </motion.button>
+        <div className="flex items-center space-x-2">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate('/profile')}
+              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-white/50 rounded-xl transition-all"
+              title="Profile"
+            >
+              <User className="w-5 h-5" />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onLogout}
+              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-white/50 rounded-xl transition-all"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5" />
+            </motion.button>
+        </div>
       </motion.header>
 
       {/* Welcome Section */}
