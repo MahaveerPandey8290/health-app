@@ -129,7 +129,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <div className="text-6xl mb-4">🌟</div>
         </motion.div>
         <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
-          {getGreeting()}, {user.name}!
+          {getGreeting()}, {user.displayName || user.name}!
         </h2>
         <p className="text-gray-600 text-lg max-w-md mx-auto">
           How are you feeling today? I'm here to support you on your wellness journey.

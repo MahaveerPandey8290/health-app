@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginScreen from './components/LoginScreen';
 import CreateAccountPage from './components/CreateAccountPage';
+import WelcomePopup from './components/WelcomePopup';
 import Dashboard from './components/Dashboard';
 import ChatScreen from './components/ChatScreen';
 import AvatarRoom from './components/AvatarRoom';
@@ -26,10 +27,19 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<string>('');
   const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [showWelcomePopup, setShowWelcomePopup] = useState(false);
+  const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
 
   const handleLogin = (email: string, password: string) => {
     const newUser = { email, name: email.split('@')[0], avatar: selectedAvatar };
     setUser(newUser);
+    
+    // Show welcome popup only if user hasn't seen it before
+    const welcomeKey = `welcome_seen_${email}`;
+    const hasSeenBefore = localStorage.getItem(welcomeKey);
+    if (!hasSeenBefore) {
+      setShowWelcomePopup(true);
+    }
   };
 
   const handleCreateAccount = (userData: {
@@ -46,6 +56,23 @@ function App() {
     };
     setUser(newUser);
     setShowCreateAccount(false);
+    
+    // Show welcome popup for new users
+    setShowWelcomePopup(true);
+  };
+
+  const handleWelcomeComplete = (displayName: string) => {
+    if (user) {
+      const updatedUser = { ...user, displayName };
+      setUser(updatedUser);
+      
+      // Mark welcome as seen for this user
+      const welcomeKey = `welcome_seen_${user.email}`;
+      localStorage.setItem(welcomeKey, 'true');
+      
+      setShowWelcomePopup(false);
+      setHasSeenWelcome(true);
+    }
   };
 
   const handleUpdateUser = (updatedUser: User) => {
@@ -55,6 +82,8 @@ function App() {
   const handleLogout = () => {
     setUser(null);
     setShowCreateAccount(false);
+    setShowWelcomePopup(false);
+    setHasSeenWelcome(false);
   };
 
   return (
@@ -108,6 +137,13 @@ function App() {
           </Routes>
         </AnimatePresence>
       </div>
+      
+      {/* Welcome Popup */}
+      <WelcomePopup 
+        isOpen={showWelcomePopup}
+        onComplete={handleWelcomeComplete}
+        userEmail={user?.email || ''}
+      />
     </Router>
   );
 }
