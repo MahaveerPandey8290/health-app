@@ -10,7 +10,7 @@ interface CreateAccountPageProps {
     email: string;
     phoneNumber: string;
     password: string;
-  }) => void;
+  }) => Promise<void>; // Make this a promise
   onShowLogin: () => void;
 }
 
@@ -75,16 +75,19 @@ const CreateAccountPage: React.FC<CreateAccountPageProps> = ({ onCreateAccount, 
 
     setIsSubmitting(true);
     
-    // Simulate form submission delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Call the parent function to handle account creation
-    onCreateAccount(formData);
-    
-    // Navigate to dashboard
-    navigate('/dashboard');
-    
-    setIsSubmitting(false);
+    try {
+      // Wait for account creation to complete
+      await onCreateAccount(formData);
+      
+      // Navigate to dashboard AFTER successful creation
+      navigate('/dashboard');
+
+    } catch (error: any) {
+        console.error("Account creation failed:", error);
+        setErrors({ form: error.message || 'Failed to create account. Please try again.' });
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   return (
@@ -130,6 +133,15 @@ const CreateAccountPage: React.FC<CreateAccountPageProps> = ({ onCreateAccount, 
           </motion.div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {errors.form && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-red-500 text-sm text-center bg-red-100 p-3 rounded-lg"
+                >
+                  {errors.form}
+                </motion.p>
+              )}
             {/* Full Name */}
             <motion.div
               initial={{ x: -50, opacity: 0 }}

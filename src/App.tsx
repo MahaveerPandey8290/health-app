@@ -1,287 +1,167 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import LoginScreen from './components/LoginScreen';
 import CreateAccountPage from './components/CreateAccountPage';
-import WelcomePopup from './components/WelcomePopup';
 import Dashboard from './components/Dashboard';
 import ChatScreen from './components/ChatScreen';
 import AvatarRoom from './components/AvatarRoom';
 import UserProfile from './components/UserProfile';
 import VideoCallScreen from './components/VideoCallScreen';
+import ErrorBoundary from './components/ErrorBoundary';
 import { AnimatePresence } from 'framer-motion';
-import { auth } from './firebase-config';
-import { onAuthStateChanged, User as FirebaseUser, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { auth, db } from './firebase-config';
+import {
+  onAuthStateChanged,
+  User as FirebaseUser,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+  updateProfile
+} from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 export interface User {
   uid: string;
   email: string | null;
   name: string | null;
-  displayName?: string;
   avatar?: string;
-  age?: string;
-  gender?: string;
-  mobileNumber?: string;
-  country?: string;
-  address?: string;
-  pincode?: string;
 }
-
-const DEMO_EMAIL = "demo@example.com";
-const DEMO_PASSWORD = "password123";
 
 function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedAvatar, setSelectedAvatar] = useState<string>('');
-  const [showCreateAccount, setShowCreateAccount] = useState(false);
-  const [showWelcomePopup, setShowWelcomePopup] = useState(false);
-  const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
+  const navigate = useNavigate();
 
-<<<<<<< HEAD
-  const handleLogin = (email: string, password: string) => {
-    const newUser = { email, name: email.split('@')[0], avatar: selectedAvatar };
-    setUser(newUser);
-    
-    // Show welcome popup only if user hasn't seen it before
-    const welcomeKey = `welcome_seen_${email}`;
-    const hasSeenBefore = localStorage.getItem(welcomeKey);
-    if (!hasSeenBefore) {
-      setShowWelcomePopup(true);
+  const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
+    const userDocRef = doc(db, "users", firebaseUser.uid);
+    const userDoc = await getDoc(userDocRef);
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      setUser({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: userData.name || firebaseUser.displayName,
+        avatar: userData.avatar,
+      });
+    } else {
+      setUser({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: firebaseUser.displayName,
+      });
     }
-=======
+  }, []);
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const appUser: User = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          name: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'User'),
-        };
-        setUser(appUser);
-        if (firebaseUser.displayName === null) {
-          setIsCreatingAccount(true);
-        }
+        await fetchUserData(firebaseUser);
       } else {
         setUser(null);
       }
       setLoading(false);
     });
-
     return () => unsubscribe();
-  }, []);
+  }, [fetchUserData]);
 
   const handleLogout = () => {
     auth.signOut();
+    navigate('/login');
   };
 
   const handleLogin = async (email: string, password: string) => {
-    // Handle demo user login with specific logic
-    if (email === DEMO_EMAIL && password === DEMO_PASSWORD) {
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        // onAuthStateChanged will handle setting user state and navigation
-      } catch (error: any) {
-        if (error.code === 'auth/user-not-found') {
-          // If demo user doesn't exist, create it
-          try {
-            await createUserWithEmailAndPassword(auth, email, password);
-            // onAuthStateChanged will set user and trigger CreateAccountScreen
-          } catch (createError: any) {
-            console.error("Error creating demo user: ", createError);
-            alert(`Could not create demo account: ${createError.message}`);
-          }
-        } else {
-          // For any other error with demo login (e.g., wrong password, network)
-          console.error("Error signing in demo user: ", error);
-          alert(`Demo login failed: ${error.message}`);
-        }
-      }
-      return;
-    }
-
-    // Handle regular user login
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged will handle the rest
+      navigate('/dashboard');
     } catch (error: any) {
       console.error("Error signing in: ", error);
-      alert("Invalid email or password. Please create an account if you haven't already.");
+      alert("Invalid email or password. Please try again.");
     }
   };
-
-  const handleGoogleSignIn = () => {
-    const provider = new GoogleAuthProvider();
-    signInWithPopup(auth, provider)
-      .then((result) => {
-        // @ts-ignore
-        if (result.additionalUserInfo?.isNewUser) {
-          setIsCreatingAccount(true);
-        }
-      }).catch((error) => {
-        console.error("Google Sign-In Error: ", error);
-        alert("Error with Google Sign-In. Please try again.");
+  
+  const handleCreateAccount = async (userData: { fullName: string; email: string; phoneNumber: string; password: string; }) => {
+    const { email, password, fullName, phoneNumber } = userData;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      await updateProfile(firebaseUser, { displayName: fullName });
+      
+      const userDocRef = doc(db, "users", firebaseUser.uid);
+      await setDoc(userDocRef, {
+        name: fullName,
+        email: email,
+        phoneNumber: phoneNumber,
+        createdAt: new Date(),
+        avatar: ''
       });
->>>>>>> 473ed4f (latest auth&DB setup)
-  };
-
-  const handleCreateAccount = (userData: {
-    fullName: string;
-    email: string;
-    phoneNumber: string;
-    password: string;
-  }) => {
-    const newUser = { 
-      email: userData.email, 
-      name: userData.fullName, 
-      avatar: selectedAvatar,
-      mobileNumber: userData.phoneNumber
-    };
-    setUser(newUser);
-    setShowCreateAccount(false);
-    
-    // Show welcome popup for new users
-    setShowWelcomePopup(true);
-  };
-
-  const handleWelcomeComplete = (displayName: string) => {
-    if (user) {
-      const updatedUser = { ...user, displayName };
-      setUser(updatedUser);
       
-      // Mark welcome as seen for this user
-      const welcomeKey = `welcome_seen_${user.email}`;
-      localStorage.setItem(welcomeKey, 'true');
-      
-      setShowWelcomePopup(false);
-      setHasSeenWelcome(true);
+    } catch (error: any) {
+      console.error("Error creating account: ", error);
+      alert(`Account creation failed: ${error.message}`);
+      throw error;
     }
   };
 
-  const handleUpdateUser = (updatedUser: User) => {
-    setUser(updatedUser);
-  };
+  const handleGoogleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+      
+      const userDocRef = doc(db, "users", firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
 
-<<<<<<< HEAD
-  const handleLogout = () => {
-    setUser(null);
-    setShowCreateAccount(false);
-    setShowWelcomePopup(false);
-    setHasSeenWelcome(false);
-=======
-  const handleShowCreateAccount = () => {
-    // This is a placeholder as we'll use navigation links instead
-    // For now, it triggers the same logic as new user creation
-    setIsCreatingAccount(true); 
->>>>>>> 473ed4f (latest auth&DB setup)
+      if (!userDoc.exists()) {
+        await setDoc(userDocRef, {
+          name: firebaseUser.displayName,
+          email: firebaseUser.email,
+          createdAt: new Date(),
+          avatar: firebaseUser.photoURL
+        });
+      }
+      navigate('/dashboard');
+    } catch (error) {
+      console.error("Google Sign-In Error: ", error);
+      alert("Error with Google Sign-In. Please try again.");
+    }
   };
 
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
-  
-  // If a user is logged in but hasn't completed profile setup, show the CreateAccountScreen
-  if (user && isCreatingAccount) {
-    return <CreateAccountScreen isOpen={true} onComplete={handleAccountCreationComplete} />;
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      <AnimatePresence mode="wait">
-        <Routes>
-          <Route 
-            path="/login" 
-            element={!user ? <LoginScreen onLogin={handleLogin} onShowCreateAccount={handleShowCreateAccount} onGoogleSignIn={handleGoogleSignIn} /> : <Navigate to="/dashboard" replace />}
-          />
-          <Route 
-            path="/dashboard" 
-            element={user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
-          />
-          <Route 
-            path="/chat" 
-            element={user ? <ChatScreen user={user} /> : <Navigate to="/login" replace />}
-          />
-          <Route 
-            path="/video-call" 
-            element={user ? <VideoCallScreen /> : <Navigate to="/login" replace />}
-          />
-          <Route 
-            path="/avatar-room" 
-            element={user ? <AvatarRoom user={user} selectedAvatar={selectedAvatar} setSelectedAvatar={setSelectedAvatar} /> : <Navigate to="/login" replace />}
-          />
-          <Route 
-            path="/profile" 
-            element={user ? <UserProfile user={user} onUpdateUser={handleUpdateUser} /> : <Navigate to="/login" replace />}
-          />
-          <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
-        </Routes>
-      </AnimatePresence>
-    </div>
+    <AnimatePresence mode="wait">
+      <Routes>
+        {user ? (
+          <>
+            <Route path="/dashboard" element={<Dashboard user={user} onLogout={handleLogout} />} />
+            <Route path="/chat" element={<ChatScreen user={user} />} />
+            <Route path="/video-call" element={<VideoCallScreen />} />
+            <Route path="/avatar-room" element={<AvatarRoom user={user} selectedAvatar={user.avatar || ''} setSelectedAvatar={(avatar) => setUser({ ...user, avatar })} />} />
+            <Route path="/profile" element={<UserProfile user={user} onUpdateUser={setUser} />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </>
+        ) : (
+          <>
+            <Route path="/login" element={<LoginScreen onLogin={handleLogin} onShowCreateAccount={() => navigate('/create-account')} onGoogleSignIn={handleGoogleSignIn} />} />
+            <Route path="/create-account" element={<CreateAccountPage onCreateAccount={handleCreateAccount} onShowLogin={() => navigate('/login')} />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </>
+        )}
+      </Routes>
+    </AnimatePresence>
   );
 }
 
 function App() {
   return (
     <Router>
-<<<<<<< HEAD
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        <AnimatePresence mode="wait">
-          <Routes>
-            <Route 
-              path="/login" 
-              element={
-                !user && !showCreateAccount ? (
-                  <LoginScreen 
-                    onLogin={handleLogin} 
-                    onShowCreateAccount={() => setShowCreateAccount(true)}
-                  />
-                ) : showCreateAccount ? (
-                  <CreateAccountPage 
-                    onCreateAccount={handleCreateAccount}
-                    onShowLogin={() => setShowCreateAccount(false)}
-                  />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              } 
-            />
-            <Route 
-              path="/dashboard" 
-              element={user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
-            />
-            <Route 
-              path="/chat" 
-              element={user ? <ChatScreen user={user} /> : <Navigate to="/login" replace />}
-            />
-            <Route 
-              path="/video-call" 
-              element={user ? <VideoCallScreen /> : <Navigate to="/login" replace />}
-            />
-            <Route 
-              path="/companion-mode" 
-              element={user ? <ChatScreen user={user} /> : <Navigate to="/login" replace />}
-            />
-            <Route 
-              path="/avatar-room" 
-              element={user ? <AvatarRoom user={user} selectedAvatar={selectedAvatar} setSelectedAvatar={setSelectedAvatar} /> : <Navigate to="/login" replace />}
-            />
-            <Route 
-              path="/profile" 
-              element={user ? <UserProfile user={user} onUpdateUser={handleUpdateUser} /> : <Navigate to="/login" replace />}
-            />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </AnimatePresence>
-      </div>
-      
-      {/* Welcome Popup */}
-      <WelcomePopup 
-        isOpen={showWelcomePopup}
-        onComplete={handleWelcomeComplete}
-        userEmail={user?.email || ''}
-      />
-=======
-      <AppContent />
->>>>>>> 473ed4f (latest auth&DB setup)
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </Router>
   );
 }

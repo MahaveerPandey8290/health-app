@@ -8,7 +8,7 @@ import studyJpg from '../assets/images/study.jpg';
 import SubscriptionPopup from './SubscriptionPopup';
 import { db, rtdb } from '../firebase-config';
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { ref, set, remove, onValue } from "firebase/database";
+import { ref, set, remove, onValue, off } from "firebase/database";
 import { v4 as uuidv4 } from 'uuid';
 
 interface ChatScreenProps {
@@ -24,7 +24,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
   const [timer, setTimer] = useState(600);
   const [showSubscription, setShowSubscription] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const [sessionId] = useState(uuidv4());
+  const [sessionId, setSessionId] = useState(uuidv4());
+  const [showModeSwitchPopup, setShowModeSwitchPopup] = useState(false);
+  const [targetMode, setTargetMode] = useState<string | null>(null);
 
   const genAI = useMemo(() => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -65,14 +67,17 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
   }, [model]);
 
   useEffect(() => {
-    if (error || !chat) {
+    // FINAL FIX: Add a safety check for the user object.
+    if (!user || !chat || error) {
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
     const temporaryChatRef = ref(rtdb, `temporary_chats/${sessionId}/${user.uid}`);
-    
+    off(temporaryChatRef);
+
+    setIsLoading(true);
+
     const listener = onValue(temporaryChatRef, (snapshot) => {
         const data = snapshot.val();
         if (data && data.messages) {
@@ -81,33 +86,38 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
         } else {
             const welcomeMessage = async () => {
                 try {
-                    const result = await chat.sendMessage(`Hello! My name is ${user.name}. Please act as an AI Wellness Companion and start our conversation with a warm welcome.`);
+                    const modePrompt = `You are an AI Wellness Companion. My name is ${user.name}. We are currently in a "${chatMode === 'tea' ? 'Tea Time' : 'Study Session'}" mode. Please start our conversation with a warm, mode-appropriate welcome.`;
+                    const result = await chat.sendMessage(modePrompt);
                     const response = await result.response;
                     const text = response.text();
                     const welcomeMsg = { role: 'model', parts: [{ text }] };
-                    setMessages([welcomeMsg]);
-                    await set(temporaryChatRef, { messages: [welcomeMsg] });
+                    
+                    // Check if component is still mounted
+                    if (chatContainerRef.current) {
+                      setMessages([welcomeMsg]);
+                      chat.history = [{role: 'user', parts: [{text: modePrompt}]}, welcomeMsg];
+                      await set(temporaryChatRef, { messages: [welcomeMsg] });
+                    }
                 } catch (e: any) {
                     console.error("Error sending initial message:", e);
-                    setError("Failed to get a welcome message from the AI. Please check your connection and API key.");
-                    const fallbackMsg = { role: 'model', parts: [{ text: `Hello ${user.name}! I'm having a little trouble connecting right now, but I'm here to help.` }] };
-                    setMessages([fallbackMsg]);
+                    setError("Failed to get a welcome message from the AI.");
                 } finally {
-                    setIsLoading(false);
+                    if (chatContainerRef.current) {
+                      setIsLoading(false);
+                    }
                 }
             };
             welcomeMessage();
         }
     }, (err) => {
         console.error("Firebase onValue error:", err);
-        setError("Failed to connect to the chat database. Check your Firebase security rules.");
+        setError("Failed to connect to the chat database.");
         setIsLoading(false);
     });
 
-    return listener;
+    return () => off(ref(rtdb, `temporary_chats/${sessionId}/${user.uid}`));
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chat, user.uid, user.name, sessionId, error]);
+  }, [chat, user, sessionId, chatMode, error]);
 
     useEffect(() => {
         if (chatContainerRef.current) {
@@ -130,14 +140,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
     }, []);
 
   const handleSend = async () => {
-    if (input.trim() === '' || !chat) return;
+    if (input.trim() === '' || !chat || isLoading) return;
 
     const userMessage = { role: 'user', parts: [{ text: input }] };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
-    const temporaryChatRef = ref(rtdb, `temporary_chats/${sessionId}/${user.uid}`);
-    set(temporaryChatRef, { messages: newMessages });
-
+    
     const currentInput = input;
     setInput('');
     setIsLoading(true);
@@ -149,7 +157,8 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
       const modelMessage = { role: 'model', parts: [{ text }] };
       const finalMessages = [...newMessages, modelMessage];
       setMessages(finalMessages);
-      set(temporaryChatRef, { messages: finalMessages });
+      const temporaryChatRef = ref(rtdb, `temporary_chats/${sessionId}/${user.uid}`);
+      await set(temporaryChatRef, { messages: finalMessages });
     } catch (e: any) {
       console.error('Error sending message:', e);
       const errorMessage = { role: 'model', parts: [{ text: 'Sorry, I am having trouble connecting. Please try again later.' }] };
@@ -159,17 +168,67 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
     }
   };
 
-  const handleSaveToHistory = async () => {
+  const handleSaveToHistory = async (silent = false) => {
+    if (messages.length === 0) {
+        if (!silent) alert("Chat is empty, nothing to save.");
+        return;
+    }
     const permanentChatRef = collection(db, "users", user.uid, "permanent_chats");
-    await addDoc(permanentChatRef, { messages, createdAt: serverTimestamp(), sessionId });
-    alert("Chat saved to history!");
+    await addDoc(permanentChatRef, { messages, createdAt: serverTimestamp(), sessionId, mode: chatMode });
+    if (!silent) {
+        alert("Chat saved to history!");
+    }
   };
 
-  const handleDeleteSession = () => {
-    const temporaryChatRef = ref(rtdb, `temporary_chats/${sessionId}/${user.uid}`);
-    remove(temporaryChatRef);
+  const handleHeaderDelete = () => {
+    if (window.confirm("Are you sure you want to delete this session? This cannot be undone.")) {
+        const temporaryChatRef = ref(rtdb, `temporary_chats/${sessionId}/${user.uid}`);
+        remove(temporaryChatRef);
+        resetChat(chatMode, true);
+        alert("Session chat deleted!");
+    }
+  };
+
+  const resetChat = (newMode: string, forceNewSession: boolean = false) => {
+    setChatMode(newMode);
     setMessages([]);
-    alert("Session chat deleted!");
+    if (forceNewSession || newMode !== chatMode) {
+        setSessionId(uuidv4()); 
+    }
+    setShowModeSwitchPopup(false);
+    setTargetMode(null);
+  }
+
+  const handleModeSwitchAttempt = (newMode: string) => {
+      if (newMode === chatMode) return;
+      if (messages.length === 0) {
+          resetChat(newMode);
+      } else {
+          setTargetMode(newMode);
+          setShowModeSwitchPopup(true);
+      }
+  };
+
+  const handleSaveAndSwitch = async () => {
+    if (targetMode) {
+        await handleSaveToHistory(true);
+        const temporaryChatRef = ref(rtdb, `temporary_chats/${sessionId}/${user.uid}`);
+        remove(temporaryChatRef);
+        resetChat(targetMode, true);
+    }
+  };
+
+  const handleDeleteAndSwitch = () => {
+      if (targetMode) {
+          const temporaryChatRef = ref(rtdb, `temporary_chats/${sessionId}/${user.uid}`);
+          remove(temporaryChatRef);
+          resetChat(targetMode, true);
+      }
+  };
+
+  const handleCancelSwitch = () => {
+      setShowModeSwitchPopup(false);
+      setTargetMode(null);
   };
 
   const formatTime = (s: number) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
@@ -178,19 +237,51 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
   if (showSubscription) return <SubscriptionPopup />;
 
   return (
-    <div className="flex flex-col h-screen bg-cover bg-center transition-all duration-500" style={{ backgroundImage: `url(${getBackground()})` }}>
+    <div ref={chatContainerRef} className="flex flex-col h-screen bg-cover bg-center transition-all duration-500" style={{ backgroundImage: `url(${getBackground()})` }}>
+        {showModeSwitchPopup && (
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm text-center"
+                >
+                    <h3 className="text-lg font-bold mb-2">Switching Modes</h3>
+                    <p className="text-gray-600 mb-6">Do you want to save the current chat before switching?</p>
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={handleSaveAndSwitch}
+                            className="w-full bg-purple-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-600 transition-colors"
+                        >
+                            Save and Switch
+                        </button>
+                        <button
+                            onClick={handleDeleteAndSwitch}
+                            className="w-full bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition-colors"
+                        >
+                            Delete and Switch
+                        </button>
+                        <button
+                            onClick={handleCancelSwitch}
+                            className="w-full bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </motion.div>
+            </div>
+        )}
       <header className="bg-white/30 backdrop-blur-sm p-4 flex justify-between items-center">
         <div className="text-sm font-medium text-gray-600">
-            {user.name}
+            {user?.name || 'User'}
         </div>
         <div className="flex items-center gap-4">
             <div className="font-mono bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm">
                 {formatTime(timer)}
             </div>
-            <button onClick={handleSaveToHistory} className="text-gray-500 hover:text-purple-600" title="Save Chat History">
+            <button onClick={() => handleSaveToHistory()} className="text-gray-500 hover:text-purple-600" title="Save Chat History">
                 <Save className="w-6 h-6" />
             </button>
-            <button onClick={handleDeleteSession} className="text-gray-500 hover:text-red-600" title="Delete Session Chat">
+            <button onClick={handleHeaderDelete} className="text-gray-500 hover:text-red-600" title="Delete Session Chat">
                 <Trash2 className="w-6 h-6" />
             </button>
         </div>
@@ -201,27 +292,26 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
             <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
             <h2 className="text-2xl font-bold text-red-700 mb-2">Chat Unavailable</h2>
             <p className="text-red-600 bg-red-100 p-3 rounded-md">{error}</p>
-            <p className="mt-4 text-gray-600">Please check the browser console for more technical details.</p>
         </div>
       ) : (
         <>
             <div className="flex justify-center my-4">
                 <div className="bg-white/50 backdrop-blur-sm rounded-full p-1 flex gap-1">
                     <button
-                    onClick={() => setChatMode('tea')}
+                    onClick={() => handleModeSwitchAttempt('tea')}
                     className={`px-4 py-2 text-sm font-semibold rounded-full flex items-center gap-2 transition-colors ${chatMode === 'tea' ? 'bg-purple-500 text-white' : 'text-gray-600 hover:bg-purple-100'}`}>
                     <Coffee className="w-5 h-5" />
                     Tea Time
                     </button>
                     <button
-                    onClick={() => setChatMode('study')}
+                    onClick={() => handleModeSwitchAttempt('study')}
                     className={`px-4 py-2 text-sm font-semibold rounded-full flex items-center gap-2 transition-colors ${chatMode === 'study' ? 'bg-purple-500 text-white' : 'text-gray-600 hover:bg-purple-100'}`}>
                     <BookOpen className="w-5 h-5" />
                     Study Session
                     </button>
                 </div>
             </div>
-            <div ref={chatContainerRef} className="flex-grow p-6 overflow-y-auto">
+            <div className="flex-grow p-6 overflow-y-auto">
             <AnimatePresence initial={false}>
               {messages.map((msg, index) => (
                 <motion.div

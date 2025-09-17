@@ -18,6 +18,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const getAvatarImage = () => {
     if (savedAvatar === 'male') return maleAvatarImg;
     if (savedAvatar === 'female') return femaleAvatarImg;
+    // Fallback to user avatar from props if available
+    if (user.avatar) return user.avatar;
     return null;
   };
 
@@ -129,11 +131,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <div className="text-6xl mb-4">🌟</div>
         </motion.div>
         <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
-<<<<<<< HEAD
-          {getGreeting()}, {user.displayName || user.name}!
-=======
           {getGreeting()}, {user.name || user.email}!
->>>>>>> 473ed4f (latest auth&DB setup)
         </h2>
         <p className="text-gray-600 text-lg max-w-md mx-auto">
           How are you feeling today? I'm here to support you on your wellness journey.

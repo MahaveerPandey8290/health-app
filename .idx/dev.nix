@@ -7,7 +7,7 @@
     command = ["npm" "install"];
   };
   idx.extensions = [
-    "svelte.svelte-vscode"
+    "svelte.svelte-vscode",
     "vue.volar"
   ];
   idx.previews = {
