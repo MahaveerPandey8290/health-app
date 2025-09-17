@@ -6,9 +6,10 @@ import FloatingShapes from './FloatingShapes';
 interface LoginScreenProps {
   onLogin: (email: string, password: string) => void;
   onShowCreateAccount: () => void;
+  onGoogleSignIn: () => void;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onShowCreateAccount }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onShowCreateAccount, onGoogleSignIn }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -111,6 +112,25 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onShowCreateAccount 
               Sign In
             </motion.button>
           </form>
+
+          <div className="my-6 flex items-center">
+            <div className="flex-grow border-t border-gray-300"></div>
+            <span className="mx-4 text-sm text-gray-500">OR</span>
+            <div className="flex-grow border-t border-gray-300"></div>
+          </div>
+
+          <motion.button
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.7, duration: 0.5 }}
+            whileHover={{ scale: 1.02, boxShadow: "0 10px 30px rgba(0, 0, 0, 0.1)" }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onGoogleSignIn}
+            className="w-full bg-white text-gray-700 font-semibold py-3 rounded-2xl border border-gray-300 hover:bg-gray-50 transition-all duration-300 shadow-md flex items-center justify-center"
+          >
+            <img src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png" alt="Google Logo" className="w-5 h-5 mr-3"/>
+            Sign in with Google
+          </motion.button>
 
           <motion.p
             initial={{ opacity: 0 }}

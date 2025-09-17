@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { auth } from '../firebase-config';
+import { updateProfile } from 'firebase/auth';
 
 interface CreateAccountScreenProps {
   isOpen: boolean;
@@ -9,10 +11,22 @@ interface CreateAccountScreenProps {
 const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({ isOpen, onComplete }) => {
   const [displayName, setDisplayName] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (auth.currentUser?.displayName) {
+      setDisplayName(auth.currentUser.displayName);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (displayName.trim()) {
-      onComplete(displayName.trim());
+    if (displayName.trim() && auth.currentUser) {
+      try {
+        await updateProfile(auth.currentUser, { displayName: displayName.trim() });
+        onComplete(displayName.trim());
+      } catch (error) {
+        console.error("Error updating profile: ", error);
+        // Handle error appropriately
+      }
     }
   };
 
