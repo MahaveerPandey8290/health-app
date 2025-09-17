@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginScreen from './components/LoginScreen';
-import CreateAccountScreen from './components/CreateAccountScreen';
+import CreateAccountPage from './components/CreateAccountPage';
 import Dashboard from './components/Dashboard';
 import ChatScreen from './components/ChatScreen';
 import AvatarRoom from './components/AvatarRoom';
@@ -25,20 +25,27 @@ export interface User {
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<string>('');
-  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
 
   const handleLogin = (email: string, password: string) => {
     const newUser = { email, name: email.split('@')[0], avatar: selectedAvatar };
     setUser(newUser);
-    setIsCreatingAccount(true); // Go to create account/welcome screen after login
   };
 
-  const handleAccountCreationComplete = (displayName: string) => {
-    if (user) {
-      const savedAvatar = localStorage.getItem('userAvatar');
-      setUser({ ...user, name: displayName, avatar: savedAvatar || '' });
-    }
-    setIsCreatingAccount(false); // Finish account creation
+  const handleCreateAccount = (userData: {
+    fullName: string;
+    email: string;
+    phoneNumber: string;
+    password: string;
+  }) => {
+    const newUser = { 
+      email: userData.email, 
+      name: userData.fullName, 
+      avatar: selectedAvatar,
+      mobileNumber: userData.phoneNumber
+    };
+    setUser(newUser);
+    setShowCreateAccount(false);
   };
 
   const handleUpdateUser = (updatedUser: User) => {
@@ -47,7 +54,7 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
-    setIsCreatingAccount(false);
+    setShowCreateAccount(false);
   };
 
   return (
@@ -58,46 +65,44 @@ function App() {
             <Route 
               path="/login" 
               element={
-                !user ? (
+                !user && !showCreateAccount ? (
                   <LoginScreen 
                     onLogin={handleLogin} 
-                    onShowCreateAccount={() => setIsCreatingAccount(true)}
+                    onShowCreateAccount={() => setShowCreateAccount(true)}
+                  />
+                ) : showCreateAccount ? (
+                  <CreateAccountPage 
+                    onCreateAccount={handleCreateAccount}
+                    onShowLogin={() => setShowCreateAccount(false)}
                   />
                 ) : (
-                  isCreatingAccount ? (
-                    <CreateAccountScreen 
-                      isOpen={true}
-                      onComplete={handleAccountCreationComplete}
-                    />
-                  ) : (
-                    <Navigate to="/dashboard" replace />
-                  )
+                  <Navigate to="/dashboard" replace />
                 )
               } 
             />
             <Route 
               path="/dashboard" 
-              element={user && !isCreatingAccount ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+              element={user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
             />
             <Route 
               path="/chat" 
-              element={user && !isCreatingAccount ? <ChatScreen user={user} /> : <Navigate to="/login" replace />}
+              element={user ? <ChatScreen user={user} /> : <Navigate to="/login" replace />}
             />
             <Route 
               path="/video-call" 
-              element={user && !isCreatingAccount ? <VideoCallScreen /> : <Navigate to="/login" replace />}
+              element={user ? <VideoCallScreen /> : <Navigate to="/login" replace />}
             />
             <Route 
               path="/companion-mode" 
-              element={user && !isCreatingAccount ? <ChatScreen user={user} /> : <Navigate to="/login" replace />}
+              element={user ? <ChatScreen user={user} /> : <Navigate to="/login" replace />}
             />
             <Route 
               path="/avatar-room" 
-              element={user && !isCreatingAccount ? <AvatarRoom user={user} selectedAvatar={selectedAvatar} setSelectedAvatar={setSelectedAvatar} /> : <Navigate to="/login" replace />}
+              element={user ? <AvatarRoom user={user} selectedAvatar={selectedAvatar} setSelectedAvatar={setSelectedAvatar} /> : <Navigate to="/login" replace />}
             />
             <Route 
               path="/profile" 
-              element={user && !isCreatingAccount ? <UserProfile user={user} onUpdateUser={handleUpdateUser} /> : <Navigate to="/login" replace />}
+              element={user ? <UserProfile user={user} onUpdateUser={handleUpdateUser} /> : <Navigate to="/login" replace />}
             />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
