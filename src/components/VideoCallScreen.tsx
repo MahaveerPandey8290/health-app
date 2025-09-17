@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import AgoraRTC, { ICameraVideoTrack, IMicrophoneAudioTrack } from 'agora-rtc-sdk-ng';
 import { motion } from 'framer-motion';
 import { Video, VideoOff, Mic, MicOff, Send } from 'lucide-react';
+import maleAvatarImg from '../assets/images/male-avatar.png';
 
 const VideoCallScreen: React.FC = () => {
     const [localVideoTrack, setLocalVideoTrack] = useState<ICameraVideoTrack | null>(null);
@@ -86,7 +87,20 @@ const VideoCallScreen: React.FC = () => {
             <div className="w-1/2 flex flex-col gap-4">
                 <div className="relative flex-grow rounded-lg overflow-hidden border-2 border-gray-700">
                     <div className="absolute top-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded-md text-sm">AI Avatar</div>
-                    <div ref={aiAvatarVideoRef} className="w-full h-full bg-black"></div> {/* Placeholder for AI avatar video */}
+                    <div ref={aiAvatarVideoRef} className="w-full h-full bg-black flex items-center justify-center">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.5 }}
+                            className="flex items-center justify-center"
+                        >
+                            <img 
+                                src={maleAvatarImg} 
+                                alt="AI Avatar Placeholder"
+                                className="w-48 h-48 md:w-64 md:h-64 lg:w-80 lg:h-80 object-cover rounded-2xl border-4 border-purple-500/30 shadow-2xl"
+                            />
+                        </motion.div>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <input
