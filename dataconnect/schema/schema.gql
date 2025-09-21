@@ -1,0 +1,59 @@
+type User @table {
+  username: String!
+  email: String!
+  createdAt: Timestamp!
+  displayName: String
+  profilePictureUrl: String
+}
+
+type MoodEntry @table {
+  user: User!
+  moodLevel: Int!
+  entryTime: Timestamp!
+  createdAt: Timestamp!
+  notes: String
+  customTags: [String]
+}
+
+type Activity @table {
+  user: User!
+  name: String!
+  activityDate: Date!
+  durationMinutes: Int!
+  createdAt: Timestamp!
+  description: String
+  intensity: String
+  associatedMoodLevel: Int
+}
+
+type JournalEntry @table {
+  user: User!
+  title: String!
+  content: String!
+  entryDate: Date!
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+  customTags: [String]
+}
+
+type Goal @table {
+  user: User!
+  name: String!
+  targetValue: String!
+  startDate: Date!
+  status: String!
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+  description: String
+  recurrence: String
+  reminderTime: Timestamp
+}
+
+type Resource @table {
+  title: String!
+  resourceType: String!
+  contentUrl: String!
+  createdAt: Timestamp!
+  description: String
+  categories: [String]
+}
