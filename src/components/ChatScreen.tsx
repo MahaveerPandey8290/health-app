@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CornerDownLeft, Loader, Book, Coffee, Save, Trash2, AlertTriangle } from 'lucide-react';
+import { CornerDownLeft, Loader, Book, Coffee, Save, Trash2, AlertTriangle, MoreVertical, History, Mic, MicOff } from 'lucide-react';
+import { X } from 'lucide-react';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, ChatSession } from '@google/generative-ai';
 import { v4 as uuidv4 } from 'uuid';
-import { ref, set, remove, serverTimestamp } from 'firebase/database';
+import { ref, set, remove, serverTimestamp, onValue, off } from 'firebase/database';
 import { rtdb } from '../firebase-config';
 import { User as AuthUser } from '../App';
 import Markdown from 'react-markdown';
@@ -49,9 +50,15 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
   const [chatMode, setChatMode] = useState('tea'); // 'tea' or 'study'
   const [showModeSwitchPopup, setShowModeSwitchPopup] = useState(false);
   const [targetMode, setTargetMode] = useState<string | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showHistoryPopup, setShowHistoryPopup] = useState(false);
+  const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
 
   const chatRef = useRef<ChatSession | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Initialize the Generative AI model
   const genAI = useMemo(() => {
@@ -133,6 +140,37 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
     }
   }, [messages, sessionId, user.uid, chatMode]);
 
+  // Load chat history
+  useEffect(() => {
+    const historyRef = ref(rtdb, `chat_history/${user.uid}`);
+    const unsubscribe = onValue(historyRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const historyArray = Object.entries(data).map(([id, chat]: [string, any]) => ({
+          id,
+          ...chat,
+        })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setChatHistory(historyArray);
+      } else {
+        setChatHistory([]);
+      }
+    });
+
+    return () => off(historyRef);
+  }, [user.uid]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Handle sending a message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,6 +212,80 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Handle voice recording
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const audioChunks: BlobPart[] = [];
+
+      recorder.ondataavailable = (event) => {
+        audioChunks.push(event.data);
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        // Here you would typically convert speech to text
+        // For now, we'll just show a placeholder message
+        const voiceMessage: Message = {
+          id: uuidv4(),
+          text: '[Voice message recorded - Speech-to-text would be implemented here]',
+          sender: 'user',
+          timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, voiceMessage]);
+        
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      alert('Could not access microphone. Please check permissions.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      setMediaRecorder(null);
+      setIsRecording(false);
+    }
+  };
+
+  // Handle menu actions
+  const handleSaveChat = () => {
+    handleSaveToHistory();
+    setShowMenu(false);
+  };
+
+  const handleDiscardChat = () => {
+    const temporaryChatRef = ref(rtdb, `temporary_chats/${user.uid}/${sessionId}`);
+    remove(temporaryChatRef);
+    setMessages([]);
+    setSessionId(uuidv4());
+    setShowMenu(false);
+  };
+
+  const handleShowHistory = () => {
+    setShowHistoryPopup(true);
+    setShowMenu(false);
+  };
+
+  const loadHistoryChat = (historyChat: any) => {
+    const loadedMessages = historyChat.messages.map((msg: any) => ({
+      ...msg,
+      timestamp: new Date(msg.timestamp),
+    }));
+    setMessages(loadedMessages);
+    setChatMode(historyChat.mode);
+    setSessionId(uuidv4()); // New session for the loaded chat
+    setShowHistoryPopup(false);
   };
 
   // Save the current chat to history
@@ -296,6 +408,53 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
             <button onClick={() => handleModeSwitchAttempt('study')} className={`px-3 py-2 rounded-lg text-sm transition-colors ${chatMode === 'study' ? 'bg-sky-500/80' : 'bg-white/20 hover:bg-white/30'}`}>
               Study Mode
             </button>
+            
+            {/* Three-dot menu */}
+            <div className="relative" ref={menuRef}>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setShowMenu(!showMenu)}
+                className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-all"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </motion.button>
+              
+              <AnimatePresence>
+                {showMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                    className="absolute right-0 top-12 bg-white/90 backdrop-blur-lg rounded-xl shadow-lg border border-white/20 py-2 min-w-[160px] z-20"
+                  >
+                    <button
+                      onClick={handleSaveChat}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-purple-100 flex items-center transition-colors"
+                      disabled={messages.length <= 1}
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Chat
+                    </button>
+                    <button
+                      onClick={handleDiscardChat}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-red-100 flex items-center transition-colors"
+                      disabled={messages.length <= 1}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Discard Chat
+                    </button>
+                    <button
+                      onClick={handleShowHistory}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-blue-100 flex items-center transition-colors"
+                    >
+                      <History className="w-4 h-4 mr-2" />
+                      Chat History
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </header>
 
@@ -350,12 +509,27 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
         {/* Input Form */}
         <form onSubmit={handleSendMessage} className="relative z-10 p-4 bg-white/10 backdrop-blur-md">
           <div className="relative">
+            {/* Voice Recording Button */}
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={isRecording ? stopRecording : startRecording}
+              className={`absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors ${
+                isRecording 
+                  ? 'bg-red-500/80 text-white animate-pulse' 
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
+            >
+              {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </motion.button>
+            
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={chatMode === 'tea' ? "Talk about what's on your mind..." : "Ask a study question..."}
-              className="w-full py-3 pl-4 pr-12 rounded-2xl bg-white/20 border-2 border-transparent focus:border-blue-400/50 focus:outline-none text-white placeholder:text-gray-300 transition-all"
+              className="w-full py-3 pl-12 pr-12 rounded-2xl bg-white/20 border-2 border-transparent focus:border-blue-400/50 focus:outline-none text-white placeholder:text-gray-300 transition-all"
               disabled={isLoading}
             />
             <button
@@ -398,6 +572,68 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
                   <button onClick={handleCancelSwitch} className="w-full px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition-colors">
                     Cancel
                   </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Chat History Popup */}
+        <AnimatePresence>
+          {showHistoryPopup && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-lg"
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full max-h-96 overflow-hidden"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold text-gray-800 flex items-center">
+                    <History className="w-5 h-5 mr-2 text-purple-600" />
+                    Chat History
+                  </h2>
+                  <button
+                    onClick={() => setShowHistoryPopup(false)}
+                    className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+                
+                <div className="overflow-y-auto max-h-64 space-y-2">
+                  {chatHistory.length === 0 ? (
+                    <p className="text-gray-500 text-center py-8">No saved chats yet</p>
+                  ) : (
+                    chatHistory.map((chat) => (
+                      <motion.button
+                        key={chat.id}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => loadHistoryChat(chat)}
+                        className="w-full p-3 text-left bg-gray-50 hover:bg-purple-50 rounded-lg transition-colors border border-gray-200"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-800 truncate">
+                              {chat.title || 'Untitled Chat'}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {chat.mode === 'tea' ? '☕ Tea Room' : '📚 Study Mode'}
+                            </p>
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {new Date(chat.timestamp).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </motion.button>
+                    ))
+                  )}
                 </div>
               </motion.div>
             </motion.div>
