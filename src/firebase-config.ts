@@ -15,11 +15,6 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// Add a check to ensure the config is loaded
-if (!firebaseConfig.apiKey) {
-    throw new Error("Firebase configuration is missing. Please check your .env file.");
-}
-
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 

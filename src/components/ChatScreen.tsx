@@ -63,15 +63,10 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
   // Initialize the Generative AI model
   const genAI = useMemo(() => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      setError("VITE_GEMINI_API_KEY is missing. Please check your .env file.");
-      return null;
-    }
     try {
       return new GoogleGenerativeAI(apiKey);
     } catch (e: any) {
       console.error("Error initializing GoogleGenerativeAI:", e);
-      setError(`Failed to initialize AI service: ${e.message}`);
       return null;
     }
   }, []);
@@ -206,7 +201,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
       setMessages(prev => [...prev, modelMessage]);
     } catch (err: any) {
       console.error("Error sending message:", err);
-      setError(`AI Error: ${err.message}. Please check your API key and network connection.`);
       // Roll back the user message on error
       setMessages(prev => prev.filter(m => m.id !== newMessage.id));
     } finally {
@@ -498,13 +492,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ user }) => {
           </AnimatePresence>
           <div ref={messagesEndRef} />
         </div>
-
-        {error && (
-          <div className="relative z-10 p-4 bg-red-500/20 text-red-100 flex items-center justify-between">
-            <span>{error}</span>
-            <button onClick={() => setError(null)} className="font-bold">X</button>
-          </div>
-        )}
 
         {/* Input Form */}
         <form onSubmit={handleSendMessage} className="relative z-10 p-4 bg-white/10 backdrop-blur-md">
